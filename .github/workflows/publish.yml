@@ -1,0 +1,44 @@
+name: Publish signed creator rules
+on:
+  workflow_dispatch:
+    inputs:
+      revision:
+        description: Signed module revision to publish
+        required: true
+        type: string
+permissions:
+  contents: read
+concurrency:
+  group: creator-rules-pages
+  cancel-in-progress: false
+jobs:
+  verify:
+    if: github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify signature and stage only the module
+        env:
+          REVISION: ${{ inputs.revision }}
+        run: node scripts/verify-creator-module.mjs modules/creator-rules.signed.json .tools/module-site "$REVISION"
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: .tools/module-site
+  deploy:
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy validated module
+        id: deployment
+        uses: actions/deploy-pages@v4
